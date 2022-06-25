@@ -32,4 +32,6 @@ public interface GravityComponent extends Component {
     boolean getInvertGravity();
 
     void clearGravity();
+
+    void tick();
 }

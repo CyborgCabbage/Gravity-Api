@@ -134,6 +134,13 @@ public abstract class GravityChangerAPI {
             GravityChangerMod.config.rotationTime
         );
     }
+
+    public static Optional<GravityComponent> getGravityComponent(Entity entity){
+        if (EntityTags.canChangeGravity(entity)) {
+            return maybeGetSafe(GRAVITY_COMPONENT, entity);
+        }
+        return Optional.empty();
+    }
     
     /**
      * Returns the world relative velocity for the given player

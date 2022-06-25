@@ -4,6 +4,7 @@ import com.fusionflux.gravity_api.GravityChangerMod;
 import com.fusionflux.gravity_api.accessor.EntityAccessor;
 import com.fusionflux.gravity_api.api.GravityChangerAPI;
 import com.fusionflux.gravity_api.util.Gravity;
+import com.fusionflux.gravity_api.util.GravityComponent;
 import com.fusionflux.gravity_api.util.RotationUtil;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
@@ -30,6 +31,7 @@ import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Mixin(Entity.class)
 public abstract class EntityMixin implements EntityAccessor {
@@ -136,30 +138,10 @@ public abstract class EntityMixin implements EntityAccessor {
             at = @At("TAIL")
     )
     private void inject_tick(CallbackInfo ci) {
-if(!world.isClient) {
-    Entity vehicle = this.getVehicle();
-    if (vehicle != null) {
-        Direction vehicleGravity = GravityChangerAPI.getGravityDirection(vehicle);
-        if (GravityChangerAPI.getIsInverted((Entity) (Object) this)) {
-            vehicleGravity = vehicleGravity.getOpposite();
+        if(!world.isClient) {
+            Optional<GravityComponent> gravityComponent = GravityChangerAPI.getGravityComponent((Entity) (Object) this);
+            gravityComponent.ifPresent(GravityComponent::tick);
         }
-        if(vehicleGravity != GravityChangerAPI.getDefaultGravityDirection((Entity) (Object) this))
-        GravityChangerAPI.addGravity((Entity) (Object) this, new Gravity(vehicleGravity, 99999999, 2, "vehicle"));
-    }
-    ArrayList<Gravity> gravityList = GravityChangerAPI.getGravityList((Entity) (Object) this);
-    ArrayList<Gravity> goodList = new ArrayList<Gravity>();
-    if (!gravityList.isEmpty()) {
-        for (Gravity temp : gravityList) {
-            if (temp.getGravityDuration() != 0) {
-                temp.decreaseDuration();
-                goodList.add(temp);
-            }
-        }
-
-        GravityChangerAPI.setGravity((Entity) (Object) this, goodList);
-        GravityChangerAPI.updateGravity((Entity) (Object) this);
-    }
-}
     }
 
     @Inject(

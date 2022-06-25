@@ -2,6 +2,7 @@ package com.fusionflux.gravity_api.util;
 
 import com.fusionflux.gravity_api.GravityChangerMod;
 import com.fusionflux.gravity_api.RotationAnimation;
+import com.fusionflux.gravity_api.api.GravityChangerAPI;
 import com.fusionflux.gravity_api.mixin.AccessorEntity;
 import dev.onyxstudios.cca.api.v3.component.sync.AutoSyncedComponent;
 import net.minecraft.entity.AreaEffectCloudEntity;
@@ -143,7 +144,29 @@ public class GravityDirectionComponent implements GravityComponent, AutoSyncedCo
         }
         return Direction.DOWN;
     }
-    
+
+    @Override
+    public void tick(){
+        Entity vehicle = entity.getVehicle();
+        if (vehicle != null) {
+            Direction vehicleGravity = GravityChangerAPI.getGravityDirection(vehicle);
+            if (getInvertGravity()) {
+                vehicleGravity = vehicleGravity.getOpposite();
+            }
+            if(vehicleGravity != getDefaultTrackedGravityDirection())
+                addGravity(new Gravity(vehicleGravity, 99999999, 1, "vehicle"), false);
+        }
+        if (!gravityList.isEmpty()) {
+            gravityList.removeIf(g -> g.getGravityDuration() == 0);
+            for (Gravity temp : gravityList) {
+                if (temp.getGravityDuration() > 0) {
+                    temp.decreaseDuration();
+                }
+            }
+            updateGravity(false);
+        }
+    }
+
     @Override
     public void updateGravity(boolean initialGravity) {
         if (canChangeGravity()) {
