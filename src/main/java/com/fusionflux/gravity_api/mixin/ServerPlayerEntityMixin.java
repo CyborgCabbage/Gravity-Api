@@ -1,9 +1,9 @@
 package com.fusionflux.gravity_api.mixin;
 
-import com.fusionflux.gravity_api.RotationAnimation;
 import com.fusionflux.gravity_api.GravityChangerMod;
 import com.fusionflux.gravity_api.accessor.ServerPlayerEntityAccessor;
 import com.fusionflux.gravity_api.api.GravityChangerAPI;
+import com.fusionflux.gravity_api.util.GravityComponent;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.packet.s2c.play.CustomPayloadS2CPacket;
@@ -16,6 +16,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import java.util.Optional;
 
 @Mixin(ServerPlayerEntity.class)
 public abstract class ServerPlayerEntityMixin implements  ServerPlayerEntityAccessor {
@@ -41,12 +43,8 @@ public abstract class ServerPlayerEntityMixin implements  ServerPlayerEntityAcce
             )
     )
     private void inject_moveToWorld_sendPacket_1(CallbackInfoReturnable<ServerPlayerEntity> cir) {
-        Direction gravityDirection = GravityChangerAPI.getGravityDirection((ServerPlayerEntity)(Object)this);
-        if(gravityDirection != GravityChangerAPI.getDefaultGravityDirection((ServerPlayerEntity)(Object)this) && GravityChangerMod.config.resetGravityOnDimensionChange) {
-            GravityChangerAPI.setDefaultGravityDirection((ServerPlayerEntity)(Object)this, Direction.DOWN);
-        } else {
-            GravityChangerAPI.setDefaultGravityDirection((ServerPlayerEntity)(Object)this, GravityChangerAPI.getDefaultGravityDirection((ServerPlayerEntity)(Object)this));
-        }
+        Optional<GravityComponent> gravityComponent = GravityChangerAPI.getGravityComponent((ServerPlayerEntity)(Object)this);
+        gravityComponent.ifPresent(GravityComponent::changeDimension);
     }
 
     @Inject(
@@ -59,12 +57,8 @@ public abstract class ServerPlayerEntityMixin implements  ServerPlayerEntityAcce
             )
     )
     private void inject_teleport_sendPacket_0(CallbackInfo ci) {
-        Direction gravityDirection = GravityChangerAPI.getGravityDirection((ServerPlayerEntity)(Object)this);
-        if(gravityDirection != GravityChangerAPI.getDefaultGravityDirection((ServerPlayerEntity)(Object)this) && GravityChangerMod.config.resetGravityOnDimensionChange) {
-            GravityChangerAPI.setDefaultGravityDirection((ServerPlayerEntity)(Object)this, Direction.DOWN);
-        } else {
-            GravityChangerAPI.setDefaultGravityDirection((ServerPlayerEntity)(Object)this, GravityChangerAPI.getDefaultGravityDirection((ServerPlayerEntity)(Object)this));
-        }
+        Optional<GravityComponent> gravityComponent = GravityChangerAPI.getGravityComponent((ServerPlayerEntity)(Object)this);
+        gravityComponent.ifPresent(GravityComponent::changeDimension);
     }
 
     @Inject(
@@ -72,9 +66,7 @@ public abstract class ServerPlayerEntityMixin implements  ServerPlayerEntityAcce
             at = @At("TAIL")
     )
     private void inject_copyFrom(ServerPlayerEntity oldPlayer, boolean alive, CallbackInfo ci) {
-        if(GravityChangerMod.config.resetGravityOnRespawn) {
-        } else {
-            GravityChangerAPI.setDefaultGravityDirection((ServerPlayerEntity)(Object)this, GravityChangerAPI.getDefaultGravityDirection(oldPlayer));
-        }
+        Optional<GravityComponent> gravityComponent = GravityChangerAPI.getGravityComponent((ServerPlayerEntity)(Object)this);
+        gravityComponent.ifPresent(gc -> gc.respawn(oldPlayer));
     }
 }

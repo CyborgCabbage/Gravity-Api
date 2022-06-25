@@ -1,37 +1,25 @@
 package com.fusionflux.gravity_api.util;
 
 import dev.onyxstudios.cca.api.v3.component.Component;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Direction;
 
 import java.util.ArrayList;
+import java.util.Optional;
 
 public interface GravityComponent extends Component {
+    Direction getGravityDirection();
 
-    void onGravityChanged(Direction prevGravityDirection, boolean initialGravity);
+    void setGravity(Gravity gravity);
 
-    Direction getTrackedGravityDirection();
-
-    void updateGravity(boolean initalGravity);
-
-    Direction getPrevTrackedGravityDirection();
-
-    void setPrevTrackedGravityDirection(Direction gravityDirection);
-
-    Direction getDefaultTrackedGravityDirection();
-
-    void setDefaultTrackedGravityDirection(Direction gravityDirection, int animationDurationMs);
-
-    void addGravity(Gravity gravity, boolean initialGravity);
-
-    ArrayList<Gravity> getGravity();
-
-    void setGravity(ArrayList<Gravity> gravityList,boolean initalGravity);
-
-    void invertGravity(boolean isInverted);
-
-    boolean getInvertGravity();
-
-    void clearGravity();
+    Optional<Direction> getGravityDirection(Identifier id);
 
     void tick();
+
+    void changeDimension();
+
+    void respawn(ServerPlayerEntity oldPlayer);
+
+    ArrayList<Gravity> getGravityList();
 }

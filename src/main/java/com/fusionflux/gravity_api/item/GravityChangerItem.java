@@ -1,6 +1,8 @@
 package com.fusionflux.gravity_api.item;
 
+import com.fusionflux.gravity_api.GravityChangerMod;
 import com.fusionflux.gravity_api.api.GravityChangerAPI;
+import com.fusionflux.gravity_api.util.Gravity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -14,31 +16,13 @@ public class GravityChangerItem extends Item {
 
     public GravityChangerItem(Settings settings, Direction gravityDirection) {
         super(settings);
-
         this.gravityDirection = gravityDirection;
     }
 
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
         if(!world.isClient)
-            GravityChangerAPI.setDefaultGravityDirection(user, this.gravityDirection);
-            //GravityChangerAPI.updateGravity(user);
+            GravityChangerAPI.setGravity(user, new Gravity(GravityChangerMod.GRAVITY_SOURCE_TRANSIENT, gravityDirection));
         return TypedActionResult.success(user.getStackInHand(hand));
     }
-
-   // @Override
-   // public ActionResult useOnEntity(ItemStack stack, PlayerEntity user, LivingEntity entity, Hand hand) {
-   //     if(!(entity instanceof PlayerEntity))
-   //     if (!user.isSneaking()) {
-   //         if (GravityChangerAPI.getGravityDirection(entity) == this.gravityDirection) {
-   //             GravityChangerAPI.setDefaultGravityDirection(entity, this.gravityDirection);
-   //         } else {
-   //             GravityChangerAPI.setGravityDirection(entity, this.gravityDirection);
-   //         }
-   //     } else {
-   //         GravityChangerAPI.setGravityDirection(entity, GravityChangerAPI.getDefaultGravityDirection(entity));
-   //     }
-   //     return ActionResult.PASS;
-   // }
-
 }
