@@ -340,7 +340,7 @@ public class GravityDirectionComponent implements GravityComponent {
             needsInitialSync = false;
             RotationParameters rp = new RotationParameters(false, false, false, 0);
             NetworkUtil.sendOverwriteGravityListToClient(entity, gravityList, true);
-            NetworkUtil.sendDefaultGravityToClient(entity, defaultGravityDirection, rp, true);
+            NetworkUtil.sendDefaultGravityToClient(entity, defaultGravityDirection, rp, true, NetworkUtil.PacketMode.EVERYONE);
             NetworkUtil.sendInvertedToClient(entity, isInverted, rp, true);
         }
     }

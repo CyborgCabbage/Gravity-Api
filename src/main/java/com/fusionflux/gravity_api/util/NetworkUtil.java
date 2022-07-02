@@ -47,19 +47,23 @@ public class NetworkUtil {
         return Optional.of(gc);
     }
 
-    //Sending packets to players that are tracking an entity
-
-    private static void sendToTracking(Entity entity, Identifier channel, PacketByteBuf buf){
-        //PlayerLookup.tracking(entity) might not return the player if entity is a player, so it has to be done separately
-        if(entity instanceof ServerPlayerEntity player)
-            ServerPlayNetworking.send(player, channel, buf);
-        sendToTrackingExcludingSelf(entity, channel, buf);
+    public enum PacketMode{
+        EVERYONE,
+        ONLY_SELF,
+        ALL_BUT_SELF
     }
 
-    private static void sendToTrackingExcludingSelf(Entity entity, Identifier channel, PacketByteBuf buf){
-        for (ServerPlayerEntity player : PlayerLookup.tracking(entity))
-            if(player != entity)
+    //Sending packets to players that are tracking an entity
+
+    private static void sendToTracking(Entity entity, Identifier channel, PacketByteBuf buf, PacketMode mode){
+        //PlayerLookup.tracking(entity) might not return the player if entity is a player, so it has to be done separately
+        if(mode != PacketMode.ALL_BUT_SELF)
+            if(entity instanceof ServerPlayerEntity player)
                 ServerPlayNetworking.send(player, channel, buf);
+        if(mode != PacketMode.ONLY_SELF)
+            for (ServerPlayerEntity player : PlayerLookup.tracking(entity))
+                if(player != entity)
+                    ServerPlayNetworking.send(player, channel, buf);
     }
 
     //Writing to buffer
@@ -111,13 +115,13 @@ public class NetworkUtil {
 
     //Gravity List: Overwrite
 
-    public static void sendOverwriteGravityListToClient(Entity entity, ArrayList<Gravity> gravityList, boolean initialGravity){
+    public static void sendOverwriteGravityListToClient(Entity entity, ArrayList<Gravity> gravityList, boolean initialGravity, PacketMode mode){
         PacketByteBuf buf = PacketByteBufs.create();
         buf.writeInt(entity.getId());
         buf.writeInt(gravityList.size());
         for (Gravity gravity : gravityList) write(buf, gravity);
         buf.writeBoolean(initialGravity);
-        sendToTracking(entity, CHANNEL_OVERWRITE_GRAVITY_LIST, buf);
+        sendToTracking(entity, CHANNEL_OVERWRITE_GRAVITY_LIST, buf, mode);
     }
 
     public static void receiveOverwriteGravityListFromServer(MinecraftClient client, ClientPlayNetworkHandler handler, PacketByteBuf buf, PacketSender responseSender){
@@ -131,11 +135,12 @@ public class NetworkUtil {
         });
     }
 
-    public static void sendOverwriteGravityListToServer(ArrayList<Gravity> gravityList, boolean initialGravity){
+    public static void sendOverwriteGravityListToServer(ArrayList<Gravity> gravityList, boolean initialGravity, Identifier verifier){
         PacketByteBuf buf = PacketByteBufs.create();
         buf.writeInt(gravityList.size());
         for (Gravity gravity : gravityList) write(buf, gravity);
         buf.writeBoolean(initialGravity);
+        buf.writeIdentifier(verifier);
         ClientPlayNetworking.send(CHANNEL_OVERWRITE_GRAVITY_LIST, buf);
     }
 
@@ -144,19 +149,28 @@ public class NetworkUtil {
         ArrayList<Gravity> gravityList = new ArrayList<>();
         for (int i = 0; i < listSize; i++) gravityList.add(readGravity(buf));
         boolean initialGravity = buf.readBoolean();
+        Identifier verifier = buf.readIdentifier();
         server.execute(() -> {
-            getGravityComponent(player).ifPresent(gc -> gc.setGravity(gravityList, initialGravity));
+            getGravityComponent(player).ifPresent(gc -> {
+                GravityVerifier.SetGravityVerifier v = GravityVerifier.SET_GRAVITY.get(verifier);
+                if (v != null && v.check(player, PacketByteBufs.create(), gravityList)) {
+                    gc.setGravity(gravityList, initialGravity);
+                    sendOverwriteGravityListToClient(player, gravityList, initialGravity, PacketMode.ALL_BUT_SELF);
+                }else {
+                    sendOverwriteGravityListToClient(player, gravityList, initialGravity, PacketMode.ONLY_SELF);
+                }
+            });
         });
     }
 
     //Gravity List: Update
 
-    public static void sendUpdateGravityListToClient(Entity entity, Gravity gravity, boolean initialGravity){
+    public static void sendUpdateGravityListToClient(Entity entity, Gravity gravity, boolean initialGravity, PacketMode mode){
         PacketByteBuf buf = PacketByteBufs.create();
         buf.writeInt(entity.getId());
         write(buf, gravity);
         buf.writeBoolean(initialGravity);
-        sendToTracking(entity, CHANNEL_UPDATE_GRAVITY_LIST, buf);
+        sendToTracking(entity, CHANNEL_UPDATE_GRAVITY_LIST, buf, mode);
     }
 
     public static void receiveUpdateGravityListFromServer(MinecraftClient client, ClientPlayNetworkHandler handler, PacketByteBuf buf, PacketSender responseSender){
@@ -168,30 +182,40 @@ public class NetworkUtil {
         });
     }
 
-    public static void sendUpdateGravityListToServer(Gravity gravity, boolean initialGravity){
+    public static void sendUpdateGravityListToServer(Gravity gravity, boolean initialGravity, Identifier verifier){
         PacketByteBuf buf = PacketByteBufs.create();
         write(buf, gravity);
         buf.writeBoolean(initialGravity);
+        buf.writeIdentifier(verifier);
         ClientPlayNetworking.send(CHANNEL_UPDATE_GRAVITY_LIST, buf);
     }
 
     public static void receiveUpdateGravityListFromClient(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, PacketByteBuf buf, PacketSender responseSender){
         Gravity gravity = readGravity(buf);
         boolean initialGravity = buf.readBoolean();
+        Identifier verifier = buf.readIdentifier();
         server.execute(() -> {
-            getGravityComponent(player).ifPresent(gc -> gc.addGravity(gravity, initialGravity));
+            getGravityComponent(player).ifPresent(gc -> {
+                GravityVerifier.AddGravityVerifier v = GravityVerifier.ADD_GRAVITY.get(verifier);
+                if (v != null && v.check(player, PacketByteBufs.create(), gravity)) {
+                    gc.addGravity(gravity, initialGravity);
+                    sendUpdateGravityListToClient(player, gravity, initialGravity, PacketMode.ALL_BUT_SELF);
+                }else {
+                    sendUpdateGravityListToClient(player, gravity, initialGravity, PacketMode.ONLY_SELF);
+                }
+            });
         });
     }
 
     //Default Gravity
 
-    public static void sendDefaultGravityToClient(Entity entity, Direction direction, RotationParameters rotationParameters, boolean initialGravity){
+    public static void sendDefaultGravityToClient(Entity entity, Direction direction, RotationParameters rotationParameters, boolean initialGravity, PacketMode mode){
         PacketByteBuf buf = PacketByteBufs.create();
         buf.writeInt(entity.getId());
         write(buf, direction);
         write(buf, rotationParameters);
         buf.writeBoolean(initialGravity);
-        sendToTracking(entity, CHANNEL_DEFAULT_GRAVITY, buf);
+        sendToTracking(entity, CHANNEL_DEFAULT_GRAVITY, buf, mode);
     }
 
     public static void receiveDefaultGravityFromServer(MinecraftClient client, ClientPlayNetworkHandler handler, PacketByteBuf buf, PacketSender responseSender){
@@ -204,11 +228,12 @@ public class NetworkUtil {
         });
     }
 
-    public static void sendDefaultGravityToServer(Direction direction, RotationParameters rotationParameters, boolean initialGravity){
+    public static void sendDefaultGravityToServer(Direction direction, RotationParameters rotationParameters, boolean initialGravity, Identifier verifier){
         PacketByteBuf buf = PacketByteBufs.create();
         write(buf, direction);
         write(buf, rotationParameters);
         buf.writeBoolean(initialGravity);
+        buf.writeIdentifier(verifier);
         ClientPlayNetworking.send(CHANNEL_DEFAULT_GRAVITY, buf);
     }
 
@@ -216,22 +241,29 @@ public class NetworkUtil {
         Direction direction = readDirection(buf);
         RotationParameters rotationParameters = readRotationParameters(buf);
         boolean initialGravity = buf.readBoolean();
+        Identifier verifier = buf.readIdentifier();
         server.execute(() -> {
             getGravityComponent(player).ifPresent(gc -> {
-                gc.setDefaultGravityDirection(direction, rotationParameters, initialGravity);
+                GravityVerifier.SetDefaultGravityVerifier v = GravityVerifier.SET_DEFAULT_GRAVITY.get(verifier);
+                if (v != null && v.check(player, PacketByteBufs.create(), direction)) {
+                    gc.setDefaultGravityDirection(direction, rotationParameters, initialGravity);
+                    sendDefaultGravityToClient(player, direction, rotationParameters, initialGravity, PacketMode.ALL_BUT_SELF);
+                }else {
+                    sendDefaultGravityToClient(player, direction, rotationParameters, initialGravity, PacketMode.ONLY_SELF);
+                }
             });
         });
     }
 
     //Inverted
 
-    public static void sendInvertedToClient(Entity entity, boolean inverted, RotationParameters rotationParameters, boolean initialGravity){
+    public static void sendInvertedToClient(Entity entity, boolean inverted, RotationParameters rotationParameters, boolean initialGravity, PacketMode mode){
         PacketByteBuf buf = PacketByteBufs.create();
         buf.writeInt(entity.getId());
         buf.writeBoolean(inverted);
         write(buf, rotationParameters);
         buf.writeBoolean(initialGravity);
-        sendToTracking(entity, CHANNEL_INVERTED, buf);
+        sendToTracking(entity, CHANNEL_INVERTED, buf, mode);
     }
 
     public static void receiveInvertedFromServer(MinecraftClient client, ClientPlayNetworkHandler handler, PacketByteBuf buf, PacketSender responseSender){
@@ -244,11 +276,12 @@ public class NetworkUtil {
         });
     }
 
-    public static void sendInvertedToServer(boolean inverted, RotationParameters rotationParameters, boolean initialGravity){
+    public static void sendInvertedToServer(boolean inverted, RotationParameters rotationParameters, boolean initialGravity, Identifier verifier){
         PacketByteBuf buf = PacketByteBufs.create();
         buf.writeBoolean(inverted);
         write(buf, rotationParameters);
         buf.writeBoolean(initialGravity);
+        buf.writeIdentifier(verifier);
         ClientPlayNetworking.send(CHANNEL_INVERTED, buf);
     }
 
@@ -256,8 +289,17 @@ public class NetworkUtil {
         boolean inverted = buf.readBoolean();
         RotationParameters rotationParameters = readRotationParameters(buf);
         boolean initialGravity = buf.readBoolean();
+        Identifier verifier = buf.readIdentifier();
         server.execute(() -> {
-            getGravityComponent(player).ifPresent(gc -> gc.invertGravity(inverted, rotationParameters, initialGravity));
+            getGravityComponent(player).ifPresent(gc -> {
+                GravityVerifier.SetInvertedVerifier v = GravityVerifier.SET_INVERTED.get(verifier);
+                if (v != null && v.check(player, PacketByteBufs.create(), inverted)) {
+                    gc.invertGravity(inverted, rotationParameters, initialGravity);
+                    sendInvertedToClient(player, inverted, rotationParameters, initialGravity, PacketMode.ALL_BUT_SELF);
+                }else {
+                    sendInvertedToClient(player, inverted, rotationParameters, initialGravity, PacketMode.ONLY_SELF);
+                }
+            });
         });
     }
 

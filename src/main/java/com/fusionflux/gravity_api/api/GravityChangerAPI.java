@@ -223,18 +223,18 @@ public abstract class GravityChangerAPI {
             if (EntityTags.canChangeGravity(entity)) {
                 maybeGetSafe(GRAVITY_COMPONENT, entity).ifPresent(gc -> {
                     gc.setDefaultGravityDirection(gravityDirection, rotationParameters, false);
-                    NetworkUtil.sendDefaultGravityToClient(entity, gravityDirection, rotationParameters, false);
+                    NetworkUtil.sendDefaultGravityToClient(entity, gravityDirection, rotationParameters, false, NetworkUtil.PacketMode.EVERYONE);
                 });
             }
         }
     }
 
-    public static void setDefaultGravityDirectionClient(ClientPlayerEntity entity, Direction gravityDirection, RotationParameters rotationParameters) {
+    public static void setDefaultGravityDirectionClient(ClientPlayerEntity entity, Direction gravityDirection, RotationParameters rotationParameters, Identifier verifier) {
         if(onCorrectSide(entity, false)) {
             if (EntityTags.canChangeGravity(entity)) {
                 maybeGetSafe(GRAVITY_COMPONENT, entity).ifPresent(gc -> {
                     gc.setDefaultGravityDirection(gravityDirection, rotationParameters, false);
-                    NetworkUtil.sendDefaultGravityToServer(gravityDirection, rotationParameters, false);
+                    NetworkUtil.sendDefaultGravityToServer(gravityDirection, rotationParameters, false, verifier);
                 });
             }
         }
